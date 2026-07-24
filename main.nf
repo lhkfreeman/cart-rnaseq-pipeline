@@ -24,8 +24,32 @@ process FASTQC {
     """
 }
 
+process MULTIQC {
+    publishDir "${params.outdir}/multiqc", mode: 'copy'
+    // The official MultiQC Docker container
+    container 'quay.io/biocontainers/multiqc:1.14--pyhdfd78af_0'
+    input:
+    // Takes a unified collecion of all FastQC outputs
+    path fastqc_results
+
+    output:
+    // Captures the final aggregated dashboard
+    path "multiqc_report.html"
+
+    script:
+    """
+    # The dot (.) tells MultiQC to scan the current working directory for any logs
+    multiqc .
+    """
+}
+
 // --- MAIN WORKFLOW ---
 workflow {
     read_pairs_ch = channel.fromFilePairs(params.reads, checkIfExists: true)
+    
+    // Step 1: Run FastQC on each sample independently
     FASTQC(read_pairs_ch)
+
+    // Step 2: Gather all FastQC outputs and pass them into MultiQC
+    MULTIQC(FASTQC.out.collect())
 }
